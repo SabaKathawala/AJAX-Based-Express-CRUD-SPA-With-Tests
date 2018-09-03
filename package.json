@@ -17,7 +17,7 @@
     "mocha": "^4.0.1",
     "morgan": "~1.8.1",
     "rand-token": "^0.3.0",
-    "request": "^2.83.0",
+    "request": "^2.88.0",
     "request-promise": "^4.2.2",
     "serve-favicon": "~2.4.2"
   }
