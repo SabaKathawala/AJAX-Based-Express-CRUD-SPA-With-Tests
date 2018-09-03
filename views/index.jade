@@ -1,0 +1,78 @@
+extends layout
+
+block content
+  h1= title
+  - if (!loggedIn)
+    button(id="log") Login
+    button(id="reg") Register
+    div(id="regDiv" class="inactive")
+      h1 Enter your details for the registration !!
+      form(method='post' id='registerUser')
+        p Username :
+          input(type='text', name='name' id='name')
+        p Password :
+          input(type='password' ,name='password' id='password')
+        p Favourite Movie :
+          input(type='text', name='movies' id='movies')
+        input(type='submit', value='signUp')
+        <br/>
+      div(id="error" class="inactive")
+
+    div(id="logDiv" class="inactive")
+      h1 Enter your details to Login !!
+      form(method='post' id='loginUser')
+        p Username :
+          input(type='text', name='username' id='username')
+        p Password :
+          input(type='password' ,name='pass' id='pass')
+        input(type='submit', value='login')
+        <br/>
+      div(id="error2" class="inactive")
+
+  - if (loggedIn)
+    button(id="home") Home
+    button(id="add") Add Post
+    button(id="view") View Profile
+    button(id="edit") Edit Profile/Delete Posts
+    button(id="logout") Logout
+    p Welcome  #{user}
+    p Favourite Movie : #{movie}
+    div(id="addDiv" class="inactive")
+      form(method='post' id='addPost')
+        p Add Post(all post are members-only by default):
+          input(type='text', name='post' id='post')
+        input(type='submit' value='Post')
+
+    div(id="editDiv" class="inactive")
+      h1 Here you can edit your Profile Details!!
+      form(method='post' id="editProfile")
+        p Favourite Movie:
+          input(type='text', name='movie' id='movie')
+        label Visible to Members Only :
+        input(type='radio', value='false' name='visibility' id='private' checked=true)
+        br
+        label Visible to all :
+        input(type='radio', value='true' name='visibility' id='public')
+        br
+        input(type='submit' value='Update Profile')
+      h3 Delete Posts
+      section(id="posts")
+
+    div(id="viewDiv" class="inactive")
+      h1 Here are your Profile Details!!
+      p Username:
+        span(id="view_username")
+      p Movie:
+        span(id="view_movie")
+      p
+        b Posts
+      section(id="viewPosts")
+
+  div(id="postContent" class="active")
+    p User Posts
+    <br/>
+    each item in posts
+      a(name = "post" id = item.id href="posts/" + item.id) #{item.value.substr(0, 7)}... <br/>
+      <br/>
+  script(type='text/javascript' src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js")
+  script(type='text/javascript' src="/js/spa.js")

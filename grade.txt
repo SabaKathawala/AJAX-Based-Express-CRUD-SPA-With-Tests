@@ -1,0 +1,4 @@
+Problems:
+- Internal error 500 for viewing posts (Node version issue)
+
+80/100

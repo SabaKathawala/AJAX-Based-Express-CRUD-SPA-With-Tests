@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+    <link href="/stylesheets/styles.css" rel="stylesheet">
+</head>
+<body>
+<h1>
+    <p id="title">
+
+    </p>
+</h1>
+
+<div id ="notLogged">
+    <button id="log">Login</button>
+    <button id="reg">Register</button>
+    <div class="inactive" id="regDiv">
+            <h1>Enter your details for the registration !!</h1>
+            <form method="post" id="registerUser">
+                <p>Username :
+                    <input type="text" name="name" id="name"/>
+                </p>
+                <p>Password :
+                    <input type="password" name="password" id="password"/>
+                </p>
+                <p>Favourite Movie :
+                    <input type="text" name="movies" id="movies"/>
+                </p>
+                <input type="submit" value="signUp"/><br/>
+            </form>
+            <div class="inactive " id="error"></div>
+        </div>
+    <div class="inactive" id="logDiv">
+            <h1>Enter your details to Login !!</h1>
+            <form method="post" id="loginUser">
+                <p>Username :
+                    <input type="text" name="username" id="username"/>
+                </p>
+                <p>Password :
+                    <input type="password" name="pass" id="pass"/>
+                </p>
+                <input type="submit" value="login"/><br/>
+            </form>
+            <div class="inactive" id="error2"></div>
+        </div>
+</div>
+
+
+<div id = logged>
+    <button id="home">Home</button>
+    <button id="add">Add Post</button>
+    <button id="view">View Profile</button>
+    <button id="edit">Edit Profile/Delete Posts</button>
+    <button id="logout">Logout</button>
+
+    <p class = "welcome"></p>
+    <p class = "movieDisplay"></p>
+    <div id="addDiv" class="inactive">
+        <form method="post" id="addPost">
+            <p>Add Post(all post are members-only by default):
+                <input type="text" name="post" id="post"/>
+            </p>
+            <input type="submit" value="Post"/>
+        </form>
+    </div>
+    <div id="editDiv" class="inactive">
+        <h1>Here you can edit your Profile Details!!</h1>
+        <form method="post" id="editProfile">
+            <p><div class="movieDisplay"></div>
+                <input type="text" name="movie" id="movie"/>
+            </p>
+            <label>Visible to Members Only :</label>
+            <input type="radio" value="false" name="visibility" id="private" checked="checked"/><br/>
+            <label>Visible to all :</label>
+            <input type="radio" value="true" name="visibility" id="public"/><br/>
+            <input type="submit" value="Update Profile"/>
+        </form>
+        <h3>Delete Posts</h3>
+        <section id="posts"></section>
+    </div>
+    <div id="viewDiv" class="inactive">
+        <h1>Here are your Profile Details!!</h1>
+        <p>Username:<span id="view_username"></span></p>
+        <p>Movie:<span id="view_movie"></span></p>
+        <p><b>Posts</b></p>
+        <section id="viewPosts"></section>
+    </div>
+</div>
+
+<div class="active" id="postContent">
+    <p>User Posts</p><br/>
+    <div id = "postData"></div>
+    <br/>
+</div>
+
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+<script type="text/javascript" src="/js/spa.js"></script>
+</body>
+</html>

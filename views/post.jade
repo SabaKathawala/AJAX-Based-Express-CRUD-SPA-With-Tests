@@ -1,0 +1,10 @@
+extends layout
+
+block content
+  h1 Post Page
+  p #{posts.value}
+  - if (visibility !== '')
+    p visibility of the post is :
+      =  visibility
+  p owner of the post is :
+      = owner

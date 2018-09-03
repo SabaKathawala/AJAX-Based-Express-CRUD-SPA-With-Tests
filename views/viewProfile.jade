@@ -1,0 +1,11 @@
+html(lang='en')
+	head
+		title View Profile
+	body
+		h1 Here are your Profile Details!!
+		div
+			p Username : #{locals.username}
+			p Movie : #{locals.movie}
+			p Posts
+			each item in locals.posts
+				p #{item.value}

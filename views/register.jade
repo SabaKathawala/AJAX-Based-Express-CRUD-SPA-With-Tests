@@ -1,0 +1,20 @@
+html(lang='en')
+	head
+		title = title
+	body
+		h1 Register
+		p Use <i>user</i> for the username and <i>pass</i> for the password.
+		form(method='post')
+			p
+				label(for='username') Username
+				input(type='text', name='username')
+			p
+				label(for='password') Password
+				input(type='password', name='password')
+			p
+				label(for='movie') Favourite Movie
+				input(type='text', name='movie')
+			input(type='submit' value='Register')
+		- each message in flash
+			h4(style="color: red;") #{message}
+

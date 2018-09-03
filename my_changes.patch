@@ -1,0 +1,1656 @@
+Index: node_modules/promise/index.js
+===================================================================
+--- node_modules/promise/index.js	(revision 9f1eb2fc1de7903c87110807d90b71138d537809)
++++ node_modules/promise/index.js	(revision 9f1eb2fc1de7903c87110807d90b71138d537809)
+@@ -1,6 +0,0 @@
+-'use strict';
+-
+-module.exports = require('./lib/core.js')
+-require('./lib/done.js')
+-require('./lib/es6-extensions.js')
+-require('./lib/node-extensions.js')
+\ No newline at end of file
+Index: node_modules/promise/lib/done.js
+===================================================================
+--- node_modules/promise/lib/done.js	(revision 9f1eb2fc1de7903c87110807d90b71138d537809)
++++ node_modules/promise/lib/done.js	(revision 9f1eb2fc1de7903c87110807d90b71138d537809)
+@@ -1,14 +0,0 @@
+-'use strict';
+-
+-var Promise = require('./core.js')
+-var asap = require('asap')
+-
+-module.exports = Promise
+-Promise.prototype.done = function (onFulfilled, onRejected) {
+-  var self = arguments.length ? this.then.apply(this, arguments) : this
+-  self.then(null, function (err) {
+-    asap(function () {
+-      throw err
+-    })
+-  })
+-}
+\ No newline at end of file
+Index: node_modules/asap/asap.js
+===================================================================
+--- node_modules/asap/asap.js	(revision 9f1eb2fc1de7903c87110807d90b71138d537809)
++++ node_modules/asap/asap.js	(revision 9f1eb2fc1de7903c87110807d90b71138d537809)
+@@ -1,113 +0,0 @@
+-
+-// Use the fastest possible means to execute a task in a future turn
+-// of the event loop.
+-
+-// linked list of tasks (single, with head node)
+-var head = {task: void 0, next: null};
+-var tail = head;
+-var flushing = false;
+-var requestFlush = void 0;
+-var isNodeJS = false;
+-
+-function flush() {
+-    /* jshint loopfunc: true */
+-
+-    while (head.next) {
+-        head = head.next;
+-        var task = head.task;
+-        head.task = void 0;
+-        var domain = head.domain;
+-
+-        if (domain) {
+-            head.domain = void 0;
+-            domain.enter();
+-        }
+-
+-        try {
+-            task();
+-
+-        } catch (e) {
+-            if (isNodeJS) {
+-                // In node, uncaught exceptions are considered fatal errors.
+-                // Re-throw them synchronously to interrupt flushing!
+-
+-                // Ensure continuation if the uncaught exception is suppressed
+-                // listening "uncaughtException" events (as domains does).
+-                // Continue in next event to avoid tick recursion.
+-                if (domain) {
+-                    domain.exit();
+-                }
+-                setTimeout(flush, 0);
+-                if (domain) {
+-                    domain.enter();
+-                }
+-
+-                throw e;
+-
+-            } else {
+-                // In browsers, uncaught exceptions are not fatal.
+-                // Re-throw them asynchronously to avoid slow-downs.
+-                setTimeout(function() {
+-                   throw e;
+-                }, 0);
+-            }
+-        }
+-
+-        if (domain) {
+-            domain.exit();
+-        }
+-    }
+-
+-    flushing = false;
+-}
+-
+-if (typeof process !== "undefined" && process.nextTick) {
+-    // Node.js before 0.9. Note that some fake-Node environments, like the
+-    // Mocha test runner, introduce a `process` global without a `nextTick`.
+-    isNodeJS = true;
+-
+-    requestFlush = function () {
+-        process.nextTick(flush);
+-    };
+-
+-} else if (typeof setImmediate === "function") {
+-    // In IE10, Node.js 0.9+, or https://github.com/NobleJS/setImmediate
+-    if (typeof window !== "undefined") {
+-        requestFlush = setImmediate.bind(window, flush);
+-    } else {
+-        requestFlush = function () {
+-            setImmediate(flush);
+-        };
+-    }
+-
+-} else if (typeof MessageChannel !== "undefined") {
+-    // modern browsers
+-    // http://www.nonblocking.io/2011/06/windownexttick.html
+-    var channel = new MessageChannel();
+-    channel.port1.onmessage = flush;
+-    requestFlush = function () {
+-        channel.port2.postMessage(0);
+-    };
+-
+-} else {
+-    // old browsers
+-    requestFlush = function () {
+-        setTimeout(flush, 0);
+-    };
+-}
+-
+-function asap(task) {
+-    tail = tail.next = {
+-        task: task,
+-        domain: isNodeJS && process.domain,
+-        next: null
+-    };
+-
+-    if (!flushing) {
+-        flushing = true;
+-        requestFlush();
+-    }
+-};
+-
+-module.exports = asap;
+-
+Index: node_modules/promise/.npmignore
+===================================================================
+--- node_modules/promise/.npmignore	(revision 9f1eb2fc1de7903c87110807d90b71138d537809)
++++ node_modules/promise/.npmignore	(revision 9f1eb2fc1de7903c87110807d90b71138d537809)
+@@ -1,6 +0,0 @@
+-components
+-node_modules
+-test
+-.gitignore
+-.travis.yml
+-component.json
+Index: public/js/spa.js
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- public/js/spa.js	(revision 9f1eb2fc1de7903c87110807d90b71138d537809)
++++ public/js/spa.js	(revision )
+@@ -1,4 +1,124 @@
+ $(document).ready(function() {
++    //first request to web app
++    $.ajax({
++        type: "GET",
++        url: "/init"
++    }).done(function (data) {
++        data = JSON.parse(data);
++        if (data.loggedIn) {
++            $("#user-profile").removeClass('inactive');
++            $("#user-profile").addClass('active');
++            $("#user").text(data.username);
++            $("#fmovie").text(data.movie);
++            $("#buttons").removeClass('inactive');
++            data.posts.forEach(function (post) {
++                let a = $("<a>");
++                $(a).text(post.value);
++                $(a).attr('href', 'posts/'+post.id);
++                $(a).attr('name', 'post');
++                $(a).attr('id', post.id);
++                $("#all-posts").append(a);
++                $("#all-posts").append('<br/>');
++            });
++        }
++        else {
++            $("#login-register").removeClass('inactive');
++        }
++    }).fail(function (data) {
++        console.log(data);
++    });
++
++
++    $("#log").on("click", function(event) {
++        $("#regDiv").addClass("inactive");
++        $("#regDiv").removeClass('active');
++
++        $("#logDiv").removeClass("inactive");
++        $("#logDiv").addClass("active");
++    });
++    //display register div on click of register button
++    $("#reg").on("click", function(event) {
++        $('#logDiv').addClass("inactive");
++        $('#logDiv').removeClass('active');
++
++        let id = "#"+ $(this).attr("id") + "Div";
++        $("#regDiv").removeClass("inactive");
++        $("#regDiv").addClass("active");
++    });
++
++    $( "#registerUser" ).submit(function( event ) {
++        event.preventDefault();
++        $("#error").text("");
++        // alert( "Handler for .submit() called." );
++        let user_name = $("#name").val();
++        let password = $("#password").val();
++        let movie_name = $("#movies").val();
++        let data= {
++            name : user_name,
++            password : password,
++            movie : movie_name
++        };
++        $.ajax({
++            type: "POST",
++            url: "/register",
++            data: data
++        }).done(function(data) {
++            data = JSON.parse(data);
++            if(data.message) {
++                $("#error").text(data.message);
++                $("#error").addClass('active');
++                $("#error").removeClass('inactive');
++            }
++            else{
++                $("#log").trigger("click");
++            }
++        });
++    });
++
++    $( "#loginUser" ).submit(function( event ) {
++        event.preventDefault();
++        $("#error2").text("");
++        // alert( "Handler for .submit() called." );
++        let user_name = $("#username").val();
++        let password = $("#pass").val();
++        let data = {
++            name : user_name,
++            password : password
++        };
++        $.ajax({
++            type: "POST",
++            url: "/login",
++            data: data
++        }).done(function(data) {
++            data = JSON.parse(data);
++            if(data.message) {
++                $("#error2").text(data.message);
++                $("#error2").addClass('active');
++                $("#error2").removeClass('inactive');
++            }
++            else{
++                $.ajax({
++                    type: "GET",
++                    url: "/getdetails"
++                }).done(function(data) {
++                    data = JSON.parse(data);
++                    $("#login-register").addClass('inactive');
++                    $("#login-register").removeClass('active');
++                    $("#user").text(data.username);
++                    $("#fmovie").text(data.movie);
++                    $("#user-profile").removeClass('inactive');
++                    $("#posts").empty();
++                    data.posts.forEach(function (post) {
++                        let p = $("<p>");
++                        $(p).text(post.value);
++                        $("#all-posts").append(p);
++                    })
++                });
++            }
++        });
++    });
++
++
+     $("#edit").on("click", function(event) {
+         $('div').addClass("inactive");
+         $('div').removeClass('active');
+@@ -64,20 +184,21 @@
+     $("#logout").on("click", function(event) {
+         $.ajax({
+             type: "GET",
+-            url: "/logout",
++            url: "/logout"
+         });
+         window.location.reload();
+     });
+ 
+-    $("a[name='post']").on("click", function(event) {
++    $(document).on("click", "a[name='post']",function(event) {
+         event.preventDefault();
+         let element = this;
+         let contentId = element.id + "content";
+         let previous_content = $('#' + contentId);
++        let link = $(element).attr('href');
+         if(previous_content.length === 0) {
+             $.ajax({
+                 type: "GET",
+-                url: this.href,
++                url: link,
+             }).done(function (post) {
+                 post = JSON.parse(post);
+                 let newContent = $("<p>");
+@@ -132,79 +253,6 @@
+         $(id).addClass("active");
+     });
+ 
+-    $("#reg").on("click", function(event) {
+-        $('div').addClass("inactive");
+-        $('div').removeClass('active');
+-
+-        let id = "#"+ $(this).attr("id") + "Div";
+-        $(id).removeClass("inactive");
+-        $(id).addClass("active");
+-    });
+-
+-    $("#log").on("click", function(event) {
+-        $('div').addClass("inactive");
+-        $('div').removeClass('active');
+-
+-        let id = "#"+ $(this).attr("id") + "Div";
+-        $(id).removeClass("inactive");
+-        $(id).addClass("active");
+-    });
+-
+-    $( "#registerUser" ).submit(function( event ) {
+-        event.preventDefault();
+-        $("#error").text("");
+-        // alert( "Handler for .submit() called." );
+-        let user_name = $("#name").val();
+-        let password = $("#password").val();
+-        let movie_name = $("#movies").val();
+-        let data= {
+-            name : user_name,
+-            password : password,
+-            movie : movie_name
+-        };
+-        $.ajax({
+-            type: "POST",
+-            url: "/register",
+-            data: data
+-        }).done(function(data) {
+-            data = JSON.parse(data);
+-            if(data.message) {
+-                $("#error").text(data.message);
+-                $("#error").addClass('active');
+-                $("#error").removeClass('inactive');
+-            }
+-            else{
+-                $("#log").trigger("click");
+-            }
+-        });
+-    });
+-
+-    $( "#loginUser" ).submit(function( event ) {
+-        event.preventDefault();
+-        $("#error2").text("");
+-        // alert( "Handler for .submit() called." );
+-        let user_name = $("#username").val();
+-        let password = $("#pass").val();
+-        let data = {
+-            name : user_name,
+-            password : password
+-        };
+-        $.ajax({
+-            type: "POST",
+-            url: "/login",
+-            data: data
+-        }).done(function(data) {
+-            data = JSON.parse(data);
+-            if(data.message) {
+-                $("#error2").text(data.message);
+-                $("#error2").addClass('active');
+-                $("#error2").removeClass('inactive');
+-            }
+-            else{
+-                window.location.reload();
+-            }
+-        });
+-    });
+ 
+     $( "#addPost" ).submit(function( event ) {
+         event.preventDefault();
+Index: node_modules/asap/README.md
+===================================================================
+--- node_modules/asap/README.md	(revision 9f1eb2fc1de7903c87110807d90b71138d537809)
++++ node_modules/asap/README.md	(revision 9f1eb2fc1de7903c87110807d90b71138d537809)
+@@ -1,81 +0,0 @@
+-
+-# ASAP
+-
+-This `asap` CommonJS package contains a single `asap` module that
+-exports a single `asap` function that executes a function **as soon as
+-possible**.
+-
+-```javascript
+-asap(function () {
+-    // ...
+-});
+-```
+-
+-More formally, ASAP provides a fast event queue that will execute tasks
+-until it is empty before yielding to the JavaScript engine's underlying
+-event-loop.  When the event queue becomes non-empty, ASAP schedules a
+-flush event, preferring for that event to occur before the JavaScript
+-engine has an opportunity to perform IO tasks or rendering, thus making
+-the first task and subsequent tasks semantically indistinguishable.
+-ASAP uses a variety of techniques to preserve this invariant on
+-different versions of browsers and NodeJS.
+-
+-By design, ASAP can starve the event loop on the theory that, if there
+-is enough work to be done synchronously, albeit in separate events, long
+-enough to starve input or output, it is a strong indicator that the
+-program needs to push back on scheduling more work.
+-
+-Take care.  ASAP can sustain infinite recursive calls indefinitely
+-without warning.  This is behaviorally equivalent to an infinite loop.
+-It will not halt from a stack overflow, but it *will* chew through
+-memory (which is an oddity I cannot explain at this time).  Just as with
+-infinite loops, you can monitor a Node process for this behavior with a
+-heart-beat signal.  As with infinite loops, a very small amount of
+-caution goes a long way to avoiding problems.
+-
+-```javascript
+-function loop() {
+-    asap(loop);
+-}
+-loop();
+-```
+-
+-ASAP is distinct from `setImmediate` in that it does not suffer the
+-overhead of returning a handle and being possible to cancel.  For a
+-`setImmediate` shim, consider [setImmediate][].
+-
+-[setImmediate]: https://github.com/noblejs/setimmediate
+-
+-If a task throws an exception, it will not interrupt the flushing of
+-high-priority tasks.  The exception will be postponed to a later,
+-low-priority event to avoid slow-downs, when the underlying JavaScript
+-engine will treat it as it does any unhandled exception.
+-
+-## Heritage
+-
+-ASAP has been factored out of the [Q][] asynchronous promise library.
+-It originally had a naïve implementation in terms of `setTimeout`, but
+-[Malte Ubl][NonBlocking] provided an insight that `postMessage` might be
+-useful for creating a high-priority, no-delay event dispatch hack.
+-Since then, Internet Explorer proposed and implemented `setImmediate`.
+-Robert Kratić began contributing to Q by measuring the performance of
+-the internal implementation of `asap`, paying particular attention to
+-error recovery.  Domenic, Robert, and I collectively settled on the
+-current strategy of unrolling the high-priority event queue internally
+-regardless of what strategy we used to dispatch the potentially
+-lower-priority flush event.  Domenic went on to make ASAP cooperate with
+-NodeJS domains.
+-
+-[Q]: https://github.com/kriskowal/q
+-[NonBlocking]: http://www.nonblocking.io/2011/06/windownexttick.html
+-
+-For further reading, Nicholas Zakas provided a thorough article on [The
+-Case for setImmediate][NCZ].
+-
+-[NCZ]: http://www.nczonline.net/blog/2013/07/09/the-case-for-setimmediate/
+-
+-## License
+-
+-Copyright 2009-2013 by Contributors
+-MIT License (enclosed)
+-
+Index: node_modules/promise/lib/core.js
+===================================================================
+--- node_modules/promise/lib/core.js	(revision 9f1eb2fc1de7903c87110807d90b71138d537809)
++++ node_modules/promise/lib/core.js	(revision 9f1eb2fc1de7903c87110807d90b71138d537809)
+@@ -1,105 +0,0 @@
+-'use strict';
+-
+-var asap = require('asap')
+-
+-module.exports = Promise;
+-function Promise(fn) {
+-  if (typeof this !== 'object') throw new TypeError('Promises must be constructed via new')
+-  if (typeof fn !== 'function') throw new TypeError('not a function')
+-  var state = null
+-  var value = null
+-  var deferreds = []
+-  var self = this
+-
+-  this.then = function(onFulfilled, onRejected) {
+-    return new self.constructor(function(resolve, reject) {
+-      handle(new Handler(onFulfilled, onRejected, resolve, reject))
+-    })
+-  }
+-
+-  function handle(deferred) {
+-    if (state === null) {
+-      deferreds.push(deferred)
+-      return
+-    }
+-    asap(function() {
+-      var cb = state ? deferred.onFulfilled : deferred.onRejected
+-      if (cb === null) {
+-        (state ? deferred.resolve : deferred.reject)(value)
+-        return
+-      }
+-      var ret
+-      try {
+-        ret = cb(value)
+-      }
+-      catch (e) {
+-        deferred.reject(e)
+-        return
+-      }
+-      deferred.resolve(ret)
+-    })
+-  }
+-
+-  function resolve(newValue) {
+-    try { //Promise Resolution Procedure: https://github.com/promises-aplus/promises-spec#the-promise-resolution-procedure
+-      if (newValue === self) throw new TypeError('A promise cannot be resolved with itself.')
+-      if (newValue && (typeof newValue === 'object' || typeof newValue === 'function')) {
+-        var then = newValue.then
+-        if (typeof then === 'function') {
+-          doResolve(then.bind(newValue), resolve, reject)
+-          return
+-        }
+-      }
+-      state = true
+-      value = newValue
+-      finale()
+-    } catch (e) { reject(e) }
+-  }
+-
+-  function reject(newValue) {
+-    state = false
+-    value = newValue
+-    finale()
+-  }
+-
+-  function finale() {
+-    for (var i = 0, len = deferreds.length; i < len; i++)
+-      handle(deferreds[i])
+-    deferreds = null
+-  }
+-
+-  doResolve(fn, resolve, reject)
+-}
+-
+-
+-function Handler(onFulfilled, onRejected, resolve, reject){
+-  this.onFulfilled = typeof onFulfilled === 'function' ? onFulfilled : null
+-  this.onRejected = typeof onRejected === 'function' ? onRejected : null
+-  this.resolve = resolve
+-  this.reject = reject
+-}
+-
+-/**
+- * Take a potentially misbehaving resolver function and make sure
+- * onFulfilled and onRejected are only called once.
+- *
+- * Makes no guarantees about asynchrony.
+- */
+-function doResolve(fn, onFulfilled, onRejected) {
+-  var done = false;
+-  try {
+-    fn(function (value) {
+-      if (done) return
+-      done = true
+-      onFulfilled(value)
+-    }, function (reason) {
+-      if (done) return
+-      done = true
+-      onRejected(reason)
+-    })
+-  } catch (ex) {
+-    if (done) return
+-    done = true
+-    onRejected(ex)
+-  }
+-}
+Index: node_modules/promise/polyfill.js
+===================================================================
+--- node_modules/promise/polyfill.js	(revision 9f1eb2fc1de7903c87110807d90b71138d537809)
++++ node_modules/promise/polyfill.js	(revision 9f1eb2fc1de7903c87110807d90b71138d537809)
+@@ -1,10 +0,0 @@
+-// not "use strict" so we can declare global "Promise"
+-
+-var asap = require('asap');
+-
+-if (typeof Promise === 'undefined') {
+-  Promise = require('./lib/core.js')
+-  require('./lib/es6-extensions.js')
+-}
+-
+-require('./polyfill-done.js');
+Index: node_modules/promise/lib/es6-extensions.js
+===================================================================
+--- node_modules/promise/lib/es6-extensions.js	(revision 9f1eb2fc1de7903c87110807d90b71138d537809)
++++ node_modules/promise/lib/es6-extensions.js	(revision 9f1eb2fc1de7903c87110807d90b71138d537809)
+@@ -1,108 +0,0 @@
+-'use strict';
+-
+-//This file contains the ES6 extensions to the core Promises/A+ API
+-
+-var Promise = require('./core.js')
+-var asap = require('asap')
+-
+-module.exports = Promise
+-
+-/* Static Functions */
+-
+-function ValuePromise(value) {
+-  this.then = function (onFulfilled) {
+-    if (typeof onFulfilled !== 'function') return this
+-    return new Promise(function (resolve, reject) {
+-      asap(function () {
+-        try {
+-          resolve(onFulfilled(value))
+-        } catch (ex) {
+-          reject(ex);
+-        }
+-      })
+-    })
+-  }
+-}
+-ValuePromise.prototype = Promise.prototype
+-
+-var TRUE = new ValuePromise(true)
+-var FALSE = new ValuePromise(false)
+-var NULL = new ValuePromise(null)
+-var UNDEFINED = new ValuePromise(undefined)
+-var ZERO = new ValuePromise(0)
+-var EMPTYSTRING = new ValuePromise('')
+-
+-Promise.resolve = function (value) {
+-  if (value instanceof Promise) return value
+-
+-  if (value === null) return NULL
+-  if (value === undefined) return UNDEFINED
+-  if (value === true) return TRUE
+-  if (value === false) return FALSE
+-  if (value === 0) return ZERO
+-  if (value === '') return EMPTYSTRING
+-
+-  if (typeof value === 'object' || typeof value === 'function') {
+-    try {
+-      var then = value.then
+-      if (typeof then === 'function') {
+-        return new Promise(then.bind(value))
+-      }
+-    } catch (ex) {
+-      return new Promise(function (resolve, reject) {
+-        reject(ex)
+-      })
+-    }
+-  }
+-
+-  return new ValuePromise(value)
+-}
+-
+-Promise.all = function (arr) {
+-  var args = Array.prototype.slice.call(arr)
+-
+-  return new Promise(function (resolve, reject) {
+-    if (args.length === 0) return resolve([])
+-    var remaining = args.length
+-    function res(i, val) {
+-      try {
+-        if (val && (typeof val === 'object' || typeof val === 'function')) {
+-          var then = val.then
+-          if (typeof then === 'function') {
+-            then.call(val, function (val) { res(i, val) }, reject)
+-            return
+-          }
+-        }
+-        args[i] = val
+-        if (--remaining === 0) {
+-          resolve(args);
+-        }
+-      } catch (ex) {
+-        reject(ex)
+-      }
+-    }
+-    for (var i = 0; i < args.length; i++) {
+-      res(i, args[i])
+-    }
+-  })
+-}
+-
+-Promise.reject = function (value) {
+-  return new Promise(function (resolve, reject) { 
+-    reject(value);
+-  });
+-}
+-
+-Promise.race = function (values) {
+-  return new Promise(function (resolve, reject) { 
+-    values.forEach(function(value){
+-      Promise.resolve(value).then(resolve, reject);
+-    })
+-  });
+-}
+-
+-/* Prototype Methods */
+-
+-Promise.prototype['catch'] = function (onRejected) {
+-  return this.then(null, onRejected);
+-}
+Index: node_modules/promise/package.json
+===================================================================
+--- node_modules/promise/package.json	(revision 9f1eb2fc1de7903c87110807d90b71138d537809)
++++ node_modules/promise/package.json	(revision 9f1eb2fc1de7903c87110807d90b71138d537809)
+@@ -1,90 +0,0 @@
+-{
+-  "_args": [
+-    [
+-      {
+-        "raw": "promise@^6.0.1",
+-        "scope": null,
+-        "escapedName": "promise",
+-        "name": "promise",
+-        "rawSpec": "^6.0.1",
+-        "spec": ">=6.0.1 <7.0.0",
+-        "type": "range"
+-      },
+-      "C:\\Users\\Akash\\express-crud-app-fsociety\\node_modules\\jstransformer"
+-    ]
+-  ],
+-  "_from": "promise@>=6.0.1 <7.0.0",
+-  "_id": "promise@6.1.0",
+-  "_inCache": true,
+-  "_location": "/promise",
+-  "_npmUser": {
+-    "name": "forbeslindesay",
+-    "email": "forbes@lindesay.co.uk"
+-  },
+-  "_npmVersion": "1.5.0-alpha-4",
+-  "_phantomChildren": {},
+-  "_requested": {
+-    "raw": "promise@^6.0.1",
+-    "scope": null,
+-    "escapedName": "promise",
+-    "name": "promise",
+-    "rawSpec": "^6.0.1",
+-    "spec": ">=6.0.1 <7.0.0",
+-    "type": "range"
+-  },
+-  "_requiredBy": [
+-    "/jstransformer"
+-  ],
+-  "_resolved": "https://registry.npmjs.org/promise/-/promise-6.1.0.tgz",
+-  "_shasum": "2ce729f6b94b45c26891ad0602c5c90e04c6eef6",
+-  "_shrinkwrap": null,
+-  "_spec": "promise@^6.0.1",
+-  "_where": "C:\\Users\\Akash\\express-crud-app-fsociety\\node_modules\\jstransformer",
+-  "author": {
+-    "name": "ForbesLindesay"
+-  },
+-  "bugs": {
+-    "url": "https://github.com/then/promise/issues"
+-  },
+-  "dependencies": {
+-    "asap": "~1.0.0"
+-  },
+-  "description": "Bare bones Promises/A+ implementation",
+-  "devDependencies": {
+-    "better-assert": "*",
+-    "mocha": "*",
+-    "promises-aplus-tests": "*"
+-  },
+-  "directories": {},
+-  "dist": {
+-    "shasum": "2ce729f6b94b45c26891ad0602c5c90e04c6eef6",
+-    "tarball": "https://registry.npmjs.org/promise/-/promise-6.1.0.tgz"
+-  },
+-  "gitHead": "c627c0cc1f886ed3aa26edec97838ec9e7dd858b",
+-  "homepage": "https://github.com/then/promise",
+-  "license": "MIT",
+-  "main": "index.js",
+-  "maintainers": [
+-    {
+-      "name": "forbeslindesay",
+-      "email": "forbes@lindesay.co.uk"
+-    },
+-    {
+-      "name": "nathan7",
+-      "email": "nathan@nathan7.eu"
+-    }
+-  ],
+-  "name": "promise",
+-  "optionalDependencies": {},
+-  "readme": "ERROR: No README data found!",
+-  "repository": {
+-    "type": "git",
+-    "url": "git+https://github.com/then/promise.git"
+-  },
+-  "scripts": {
+-    "test": "mocha --timeout 200 --slow 99999",
+-    "test-extensions": "mocha test/extensions-tests.js -R spec --timeout 200 --slow 999999",
+-    "test-resolve": "mocha test/resolver-tests.js -R spec --timeout 200 --slow 999999"
+-  },
+-  "version": "6.1.0"
+-}
+Index: routes/index.js
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- routes/index.js	(revision 9f1eb2fc1de7903c87110807d90b71138d537809)
++++ routes/index.js	(revision )
+@@ -1,35 +1,61 @@
+ var express = require('express');
+ var router = express.Router();
+-/* 
+-    Define the home page with session management. 
+-    It returns only public posts in case the user is 
++/*
++    Define the home page with session management.
++    It returns only public posts in case the user is
+     not loggedd in and all the posts in case of a valid session.
+-    Provides buttons to login, register or add post functionality depending on "isLoggedIn" status. 
++    Provides buttons to login, register or add post functionality depending on "isLoggedIn" status.
+ */
+-router.get('/', function(req, res){
+-    var loggedIn = (req.session && req.session.token);
+-    var postIds = Object.keys(req.app.locals.posts).filter(function(post) {
+-        return loggedIn || req.app.locals.posts[post].visibility;
+-        }
+-    );
+-    var posts = postIds.map(function(key){return req.app.locals.posts[key];});
+-    let username = loggedIn ? req.app.locals.token[req.session.token] : "";
+-    let movie = loggedIn ? req.app.locals.users[username].movie : "";
+-    res.render('index', {
++
++router.get('/init', function (req, res) {
++    if(!req.session || !req.session.token) {
++        console.log("saba");
++
++        var postIds = Object.keys(req.app.locals.posts).filter(function(post) {
++                req.app.locals.posts[post].visibility;
++            }
++        )
++        console.log(postIds);
++        var posts = postIds.map(function(key){return req.app.locals.posts[key]});
++        console.log(posts);
++        res.send(JSON.stringify({
++            loggedIn: false,
++            posts: posts
++        }));
++    }
++    else {
++        console.log("saba");
++        var posts = Object.keys(req.app.locals.posts).
++        map(function(key){return req.app.locals.posts[key]});
++        var username = req.app.locals.token[req.session.token];
++        var movie = req.app.locals.users[username].movie;
++        res.send(JSON.stringify({
++            user: username,
++            movie: movie,
++            loggedIn: true,
++            posts: posts
++        }));
++    }
++});
++
++router.get('/getdetails', function(req, res){
++    var posts = Object.keys(req.app.locals.posts).map(function(key){return req.app.locals.posts[key]});
++    var username = req.app.locals.token[req.session.token];
++    var movie = req.app.locals.users[username].movie;
++    console.log(posts);
++    res.send(JSON.stringify({
+         title: 'Home',
+         user: username,
+         movie: movie,
+-        loggedIn: loggedIn,
+         posts: posts
+-    });
++    }));
+ });
+-
+ 
+ 
+ //Define the logout functionality
+ router.get('/logout', function (req, res, next) {
+-  delete req.session.token;
+-  rres.send(JSON.stringify({status:'200'}));
++    delete req.session.token;
++    res.send(JSON.stringify({status:'200'}));
+ });
+ 
+ 
+@@ -49,7 +75,7 @@
+ });
+ 
+ 
+-//Define editprofile page to enable editing favourite movie of the user and display all the posts of the app 
++//Define editprofile page to enable editing favourite movie of the user and display all the posts of the app
+ //with the option to delete individual posts
+ router.get('/editprofile', function(req, res){
+     var token = req.session.token;
+@@ -57,27 +83,27 @@
+     var user = req.app.locals.users[username];
+     var postIds = req.app.locals.users[username].posts;
+     var posts = postIds.map(function(id) {
+-    return req.app.locals.posts[id];
++        return req.app.locals.posts[id];
+     });
+-   res.send(JSON.stringify({
+-      username: user.name,
+-      movie : user.movie,
+-      posts : posts
++    res.send(JSON.stringify({
++        username: user.name,
++        movie : user.movie,
++        posts : posts
+     }));
+ });
+ 
+ router.get('/getposts', function(req, res){
+-    let token = req.session.token;
+-    let username = req.app.locals.token[token];
+-    let user = req.app.locals.users[username];
+-    let postIds = req.app.locals.users[username].posts;
+-    let postContent = postIds.map(function(id) {
++    var token = req.session.token;
++    var username = req.app.locals.token[token];
++    var user = req.app.locals.users[username];
++    var postIds = req.app.locals.users[username].posts;
++    var postContent = postIds.map(function(id) {
+         return req.app.locals.posts[id];
+     });
+     res.send(postContent);
+ });
+ 
+-//Post method defined to update the movie name 
++//Post method defined to update the movie name
+ //and visibility of the posts (one setting for all posts)for that user.
+ router.post('/editProfile', function(req, res) {
+     var token = req.session.token;
+@@ -105,19 +131,19 @@
+ 
+ //Post method to delete a specific post of a user.
+ router.post('/deletepost', function(req, res){
+-    let token = req.session.token;
+-    let userName = req.app.locals.token[token];
+-    let postIds = req.app.locals.users[userName].posts;
+-    let id= req.body.id;
+-  
++    var token = req.session.token;
++    var userName = req.app.locals.token[token];
++    var postIds = req.app.locals.users[userName].posts;
++    var id= req.body.id;
++
+     if (postIds.indexOf(id) === -1) {
+-        let error = {status: 401, stack: []};
+-        //let message = "Unauthorized Access";
++        var error = {status: 401, stack: []};
++        //var message = "Unauthorized Access";
+         //res.status(401);
+         res.send(JSON.stringify({status:'401', message:'Unauthorized Access!'}));
+     }
+     else {
+-        let index = req.app.locals.users[userName].posts.indexOf(id);
++        var index = req.app.locals.users[userName].posts.indexOf(id);
+         if (index !== -1)
+             req.app.locals.users[userName].posts.splice(index, 1);
+         delete req.app.locals.posts[id];
+@@ -130,43 +156,43 @@
+ //Post method to authenticate the user and allow login.
+ // It flashes an error message in case the username/password is not valid.
+ router.post('/login', function (req, res, next) {
+-  var username = req.body.name;
+-  var pass = req.body.password;
++    var username = req.body.name;
++    var pass = req.body.password;
+     if (username && req.app.locals.users[username] && pass && req.app.locals.users[username].pass === pass) {
+-    req.session.token = req.app.locals.users[username].token;
+-    res.send(JSON.stringify({status:'200'}))
+-  } else {
+-      //req.flash('error2', 'Username and password are incorrect');
+-      res.send(JSON.stringify({status:'200', message:'Invalid username or password!'}));
++        req.session.token = req.app.locals.users[username].token;
++        res.send(JSON.stringify({status:'200'}))
++    } else {
++        //req.flash('error2', 'Username and password are incorrect');
++        res.send(JSON.stringify({status:'200', message:'Invalid username or password!'}));
+ 
+-  }
++    }
+ });
+ 
+ //Post method to add a new user and create the profile
+-// It flashes an error message in case of duplicate username. 
++// It flashes an error message in case of duplicate username.
+ router.post('/register', function (req, res, next) {
+-  var token = req.app.randtoken.generate(16);
+-  var username = req.body.name;
+-  if(req.app.locals.users[username]) {
+-    req.flash('error', 'User name already exists!');
+-    res.send(JSON.stringify({status:'200', message:'User name already exists!'}));
+-  }
+-  else {
+-      var pass = req.body.password;
+-      var movie = req.body.movie;
+-      var user = {
+-          name: username,
+-          pass: pass,
+-          movie: movie,
+-          token: token,
+-          posts: []
+-      };
++    var token = req.app.randtoken.generate(16);
++    var username = req.body.name;
++    if(req.app.locals.users[username]) {
++        req.flash('error', 'User name already exists!');
++        res.send(JSON.stringify({status:'200', message:'User name already exists!'}));
++    }
++    else {
++        var pass = req.body.password;
++        var movie = req.body.movie;
++        var user = {
++            name: username,
++            pass: pass,
++            movie: movie,
++            token: token,
++            posts: []
++        };
+ 
+-      req.app.locals.users[username] = user;
+-      req.app.locals.token[token] = username;
+-      req.app.locals.users[token] = username;
+-      res.send(JSON.stringify({status:'200'}));
+-  }
++        req.app.locals.users[username] = user;
++        req.app.locals.token[token] = username;
++        req.app.locals.users[token] = username;
++        res.send(JSON.stringify({status:'200'}));
++    }
+ });
+ 
+ //Post method to add a new post for a user.
+@@ -188,7 +214,7 @@
+     res.send(JSON.stringify({status:'200'}));
+ });
+ 
+-//To enable unique url for each post 
++//To enable unique url for each post
+ router.get('/posts/:postId', function(req, res){
+     var postId = req.params.postId;
+     var posts = req.app.locals.posts[postId];
+@@ -201,11 +227,11 @@
+         res.send("unauthorized");
+     }
+     else {
+-        let currentUser = req.app.locals.token[req.session.token];
+-        let owner = Object.values(req.app.locals.users).filter(function (user) {
++        var currentUser = req.app.locals.token[req.session.token];
++        var owner = Object.values(req.app.locals.users).filter(function (user) {
+             return user.posts && user.posts.indexOf(postId) >= 0;
+         })[0].name;
+-        let isOwner = owner === currentUser;
++        var isOwner = owner === currentUser;
+         var data = {
+             posts: posts,
+             visibility: isOwner ? posts.visibility ? 'public' : 'private' : '',
+Index: node_modules/asap/LICENSE.md
+===================================================================
+--- node_modules/asap/LICENSE.md	(revision 9f1eb2fc1de7903c87110807d90b71138d537809)
++++ node_modules/asap/LICENSE.md	(revision 9f1eb2fc1de7903c87110807d90b71138d537809)
+@@ -1,20 +0,0 @@
+-
+-Copyright 2009–2013 Contributors. All rights reserved.
+-Permission is hereby granted, free of charge, to any person obtaining a copy
+-of this software and associated documentation files (the "Software"), to
+-deal in the Software without restriction, including without limitation the
+-rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+-sell copies of the Software, and to permit persons to whom the Software is
+-furnished to do so, subject to the following conditions:
+-
+-The above copyright notice and this permission notice shall be included in
+-all copies or substantial portions of the Software.
+-
+-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+-FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+-IN THE SOFTWARE.
+-
+Index: views/editProfile.jade
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- views/editProfile.jade	(revision 9f1eb2fc1de7903c87110807d90b71138d537809)
++++ views/editProfile.jade	(revision )
+@@ -3,9 +3,9 @@
+ 		title Edit Profile
+ 	body
+ 		h1 Here you can edit your Profile Details!!
+-		form(method='post')
++		form(method='post' id="editProfile")
+ 			p Favourite Movie:
+-				input(type='text', name='movie' value='#{movie}')
++				input(type='text', name='movie' id='movie' value='#{movie}')
+ 			label Visible to Members Only :
+ 			input(type='radio', value='false' name='visibility' id='private' checked=true)
+ 			br
+@@ -20,5 +20,7 @@
+ 				input(type='hidden' readonly, name='id' value='#{item.id}')
+ 				input(type='submit' value='Delete post')
+ 
++		script(type='text/javascript' src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js")
++		script(type='text/javascript' src="/js/spa.js")
+ 
+ 			
+\ No newline at end of file
+Index: node_modules/promise/.jshintrc
+===================================================================
+--- node_modules/promise/.jshintrc	(revision 9f1eb2fc1de7903c87110807d90b71138d537809)
++++ node_modules/promise/.jshintrc	(revision 9f1eb2fc1de7903c87110807d90b71138d537809)
+@@ -1,5 +0,0 @@
+-{
+-  "asi": true,
+-  "node": true,
+-  "strict": true
+-}
+Index: node_modules/promise/core.js
+===================================================================
+--- node_modules/promise/core.js	(revision 9f1eb2fc1de7903c87110807d90b71138d537809)
++++ node_modules/promise/core.js	(revision 9f1eb2fc1de7903c87110807d90b71138d537809)
+@@ -1,5 +0,0 @@
+-'use strict';
+-
+-module.exports = require('./lib/core.js');
+-
+-console.error('require("promise/core") is deprecated, use require("promise/lib/core") instead.');
+Index: node_modules/promise/Readme.md
+===================================================================
+--- node_modules/promise/Readme.md	(revision 9f1eb2fc1de7903c87110807d90b71138d537809)
++++ node_modules/promise/Readme.md	(revision 9f1eb2fc1de7903c87110807d90b71138d537809)
+@@ -1,221 +0,0 @@
+-<a href="https://promisesaplus.com/"><img src="https://promisesaplus.com/assets/logo-small.png" align="right" /></a>
+-# promise
+-
+-This is a simple implementation of Promises.  It is a super set of ES6 Promises designed to have readable, performant code and to provide just the extensions that are absolutely necessary for using promises today.
+-
+-For detailed tutorials on its use, see www.promisejs.org
+-
+-[![Build Status](https://img.shields.io/travis/then/promise/master.svg)](https://travis-ci.org/then/promise)
+-[![Dependency Status](https://img.shields.io/gemnasium/then/promise.svg)](https://gemnasium.com/then/promise)
+-[![NPM version](https://img.shields.io/npm/v/promise.svg)](https://www.npmjs.org/package/promise)
+-
+-## Installation
+-
+-**Server:**
+-
+-    $ npm install promise
+-
+-**Client:**
+-
+-You can use browserify on the client, or use the pre-compiled script that acts as a polyfill.
+-
+-```html
+-<script src="https://www.promisejs.org/polyfills/promise-6.1.0.js"></script>
+-```
+-
+-Note that the [es5-shim](https://github.com/es-shims/es5-shim) must be loaded before this library to support browsers pre IE9.
+-
+-```html
+-<script src="https://cdnjs.cloudflare.com/ajax/libs/es5-shim/3.4.0/es5-shim.min.js"></script>
+-```
+-
+-## Usage
+-
+-The example below shows how you can load the promise library (in a way that works on both client and server).  It then demonstrates creating a promise from scratch.  You simply call `new Promise(fn)`.  There is a complete specification for what is returned by this method in [Promises/A+](http://promises-aplus.github.com/promises-spec/).
+-
+-```javascript
+-var Promise = require('promise');
+-
+-var promise = new Promise(function (resolve, reject) {
+-  get('http://www.google.com', function (err, res) {
+-    if (err) reject(err);
+-    else resolve(res);
+-  });
+-});
+-```
+-
+-## API
+-
+-Before all examples, you will need:
+-
+-```js
+-var Promise = require('promise');
+-```
+-
+-### new Promise(resolver)
+-
+-This creates and returns a new promise.  `resolver` must be a function.  The `resolver` function is passed two arguments:
+-
+- 1. `resolve` should be called with a single argument.  If it is called with a non-promise value then the promise is fulfilled with that value.  If it is called with a promise (A) then the returned promise takes on the state of that new promise (A).
+- 2. `reject` should be called with a single argument.  The returned promise will be rejected with that argument.
+-
+-### Static Functions
+-
+-  These methods are invoked by calling `Promise.methodName`.
+-
+-#### Promise.resolve(value)
+-
+-(deprecated aliases: `Promise.from(value)`, `Promise.cast(value)`)
+-
+-Converts values and foreign promises into Promises/A+ promises.  If you pass it a value then it returns a Promise for that value.  If you pass it something that is close to a promise (such as a jQuery attempt at a promise) it returns a Promise that takes on the state of `value` (rejected or fulfilled).
+-
+-#### Promise.all(array)
+-
+-Returns a promise for an array.  If it is called with a single argument that `Array.isArray` then this returns a promise for a copy of that array with any promises replaced by their fulfilled values.  Otherwise it returns a promise for an array that conatins its arguments, except with promises replaced by their resolution values.  e.g.
+-
+-```js
+-Promise.all([Promise.resolve('a'), 'b', Promise.resolve('c')])
+-  .then(function (res) {
+-    assert(res[0] === 'a')
+-    assert(res[1] === 'b')
+-    assert(res[2] === 'c')
+-  })
+-
+-Promise.all(Promise.resolve('a'), 'b', Promise.resolve('c'))
+-  .then(function (res) {
+-    assert(res[0] === 'a')
+-    assert(res[1] === 'b')
+-    assert(res[2] === 'c')
+-  })
+-```
+-
+-#### Promise.denodeify(fn)
+-
+-_Non Standard_
+-
+-Takes a function which accepts a node style callback and returns a new function that returns a promise instead.
+-
+-e.g.
+-
+-```javascript
+-var fs = require('fs')
+-
+-var read = Promise.denodeify(fs.readFile)
+-var write = Promise.denodeify(fs.writeFile)
+-
+-var p = read('foo.json', 'utf8')
+-  .then(function (str) {
+-    return write('foo.json', JSON.stringify(JSON.parse(str), null, '  '), 'utf8')
+-  })
+-```
+-
+-#### Promise.nodeify(fn)
+-
+-_Non Standard_
+-
+-The twin to `denodeify` is useful when you want to export an API that can be used by people who haven't learnt about the brilliance of promises yet.
+-
+-```javascript
+-module.exports = Promise.nodeify(awesomeAPI)
+-function awesomeAPI(a, b) {
+-  return download(a, b)
+-}
+-```
+-
+-If the last argument passed to `module.exports` is a function, then it will be treated like a node.js callback and not parsed on to the child function, otherwise the API will just return a promise.
+-
+-### Prototype Methods
+-
+-These methods are invoked on a promise instance by calling `myPromise.methodName`
+-
+-### Promise#then(onFulfilled, onRejected)
+-
+-This method follows the [Promises/A+ spec](http://promises-aplus.github.io/promises-spec/).  It explains things very clearly so I recommend you read it.
+-
+-Either `onFulfilled` or `onRejected` will be called and they will not be called more than once.  They will be passed a single argument and will always be called asynchronously (in the next turn of the event loop).
+-
+-If the promise is fulfilled then `onFulfilled` is called.  If the promise is rejected then `onRejected` is called.
+-
+-The call to `.then` also returns a promise.  If the handler that is called returns a promise, the promise returned by `.then` takes on the state of that returned promise.  If the handler that is called returns a value that is not a promise, the promise returned by `.then` will be fulfilled with that value. If the handler that is called throws an exception then the promise returned by `.then` is rejected with that exception.
+-
+-#### Promise#catch(onRejected)
+-
+-Sugar for `Promise#then(null, onRejected)`, to mirror `catch` in synchronous code.
+-
+-#### Promise#done(onFulfilled, onRejected)
+-
+-_Non Standard_
+-
+-The same semantics as `.then` except that it does not return a promise and any exceptions are re-thrown so that they can be logged (crashing the application in non-browser environments)
+-
+-#### Promise#nodeify(callback)
+-
+-_Non Standard_
+-
+-If `callback` is `null` or `undefined` it just returns `this`.  If `callback` is a function it is called with rejection reason as the first argument and result as the second argument (as per the node.js convention).
+-
+-This lets you write API functions that look like:
+-
+-```javascript
+-function awesomeAPI(foo, bar, callback) {
+-  return internalAPI(foo, bar)
+-    .then(parseResult)
+-    .then(null, retryErrors)
+-    .nodeify(callback)
+-}
+-```
+-
+-People who use typical node.js style callbacks will be able to just pass a callback and get the expected behavior.  The enlightened people can not pass a callback and will get awesome promises.
+-
+-## Extending Promises
+-
+-  There are three options for extending the promises created by this library.
+-
+-### Inheritance
+-
+-  You can use inheritance if you want to create your own complete promise library with this as your basic starting point, perfect if you have lots of cool features you want to add.  Here is an example of a promise library called `Awesome`, which is built on top of `Promise` correctly.
+-
+-```javascript
+-var Promise = require('promise');
+-function Awesome(fn) {
+-  if (!(this instanceof Awesome)) return new Awesome(fn);
+-  Promise.call(this, fn);
+-}
+-Awesome.prototype = Object.create(Promise.prototype);
+-Awesome.prototype.constructor = Awesome;
+-
+-//Awesome extension
+-Awesome.prototype.spread = function (cb) {
+-  return this.then(function (arr) {
+-    return cb.apply(this, arr);
+-  })
+-};
+-```
+-
+-  N.B. if you fail to set the prototype and constructor properly or fail to do Promise.call, things can fail in really subtle ways.
+-
+-### Wrap
+-
+-  This is the nuclear option, for when you want to start from scratch.  It ensures you won't be impacted by anyone who is extending the prototype (see below).
+-
+-```javascript
+-function Uber(fn) {
+-  if (!(this instanceof Uber)) return new Uber(fn);
+-  var _prom = new Promise(fn);
+-  this.then = _prom.then;
+-}
+-
+-Uber.prototype.spread = function (cb) {
+-  return this.then(function (arr) {
+-    return cb.apply(this, arr);
+-  })
+-};
+-```
+-
+-### Extending the Prototype
+-
+-  In general, you should never extend the prototype of this promise implimenation because your extensions could easily conflict with someone elses extensions.  However, this organisation will host a library of extensions which do not conflict with each other, so you can safely enable any of those.  If you think of an extension that we don't provide and you want to write it, submit an issue on this repository and (if I agree) I'll set you up with a repository and give you permission to commit to it.
+-
+-## License
+-
+-  MIT
+Index: node_modules/promise/lib/node-extensions.js
+===================================================================
+--- node_modules/promise/lib/node-extensions.js	(revision 9f1eb2fc1de7903c87110807d90b71138d537809)
++++ node_modules/promise/lib/node-extensions.js	(revision 9f1eb2fc1de7903c87110807d90b71138d537809)
+@@ -1,63 +0,0 @@
+-'use strict';
+-
+-//This file contains then/promise specific extensions that are only useful for node.js interop
+-
+-var Promise = require('./core.js')
+-var asap = require('asap')
+-
+-module.exports = Promise
+-
+-/* Static Functions */
+-
+-Promise.denodeify = function (fn, argumentCount) {
+-  argumentCount = argumentCount || Infinity
+-  return function () {
+-    var self = this
+-    var args = Array.prototype.slice.call(arguments)
+-    return new Promise(function (resolve, reject) {
+-      while (args.length && args.length > argumentCount) {
+-        args.pop()
+-      }
+-      args.push(function (err, res) {
+-        if (err) reject(err)
+-        else resolve(res)
+-      })
+-      var res = fn.apply(self, args)
+-      if (res && (typeof res === 'object' || typeof res === 'function') && typeof res.then === 'function') {
+-        resolve(res)
+-      }
+-    })
+-  }
+-}
+-Promise.nodeify = function (fn) {
+-  return function () {
+-    var args = Array.prototype.slice.call(arguments)
+-    var callback = typeof args[args.length - 1] === 'function' ? args.pop() : null
+-    var ctx = this
+-    try {
+-      return fn.apply(this, arguments).nodeify(callback, ctx)
+-    } catch (ex) {
+-      if (callback === null || typeof callback == 'undefined') {
+-        return new Promise(function (resolve, reject) { reject(ex) })
+-      } else {
+-        asap(function () {
+-          callback.call(ctx, ex)
+-        })
+-      }
+-    }
+-  }
+-}
+-
+-Promise.prototype.nodeify = function (callback, ctx) {
+-  if (typeof callback != 'function') return this
+-
+-  this.then(function (value) {
+-    asap(function () {
+-      callback.call(ctx, null, value)
+-    })
+-  }, function (err) {
+-    asap(function () {
+-      callback.call(ctx, err)
+-    })
+-  })
+-}
+Index: node_modules/promise/polyfill-done.js
+===================================================================
+--- node_modules/promise/polyfill-done.js	(revision 9f1eb2fc1de7903c87110807d90b71138d537809)
++++ node_modules/promise/polyfill-done.js	(revision 9f1eb2fc1de7903c87110807d90b71138d537809)
+@@ -1,12 +0,0 @@
+-// should work in any browser without browserify
+-
+-if (typeof Promise.prototype.done !== 'function') {
+-  Promise.prototype.done = function (onFulfilled, onRejected) {
+-    var self = arguments.length ? this.then.apply(this, arguments) : this
+-    self.then(null, function (err) {
+-      setTimeout(function () {
+-        throw err
+-      }, 0)
+-    })
+-  }
+-}
+\ No newline at end of file
+Index: app.js
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- app.js	(revision 9f1eb2fc1de7903c87110807d90b71138d537809)
++++ app.js	(revision )
+@@ -90,33 +90,32 @@
+ We just checks if a token exists and the session is maintained.
+ if not we redirect to login.
+ */
+-function checkAuth (req, res, next) {
+-    var exceptions = ['/login', '/register', '/', '/editprofile'];
+-    //Hacky way to bypass the check for posts url added.
+-    if(req.url.startsWith('/addpost') && (!req.session || !req.session.token)){
+-        var error = {status : 401, stack : []};
+-        var message = "Unauthorized Request";
+-        res.status(401);
+-        res.render('error', {
+-            error: error,
+-            message : message
+-        });
+-        // res.redirect("/error");
+-    }
+-    else {
+-        let allowedUrls = ['/posts', '/styles', '/js'];
+-        let allowed = false;
+-        allowedUrls.forEach(function(url){allowed = allowed || req.url.startsWith(url)});
+-        if (!allowed && exceptions.indexOf(req.url) === -1 && (!req.session || !req.session.token)) {
+-                res.redirect('/login');
+-                return;
+-            }
+-            else {
+-                next();
+-            }
+-    }
+-
+-}
++// function checkAuth (req, res, next) {
++//     var exceptions = ['/login', '/register', '/', '/editprofile', '/getdetails'];
++//     //Hacky way to bypass the check for posts url added.
++//     if(req.url.startsWith('/addpost') && (!req.session || !req.session.token)){
++//         var error = {status : 401, stack : []};
++//         var message = "Unauthorized Request";
++//         res.status(401);
++//         res.render('error', {
++//             error: error,
++//             message : message
++//         });
++//         // res.redirect("/error");
++//     }
++//     else {
++//         var allowedUrls = ['/posts', '/styles', '/js'];
++//         var allowed = false;
++//         allowedUrls.forEach(function(url){allowed = allowed || req.url.startsWith(url)});
++//         if (!allowed && exceptions.indexOf(req.url) === -1 && (!req.session || !req.session.token)) {
++//             res.redirect('/login');
++//             return;
++//         }
++//         else {
++//             next();
++//         }
++//     }
++// }
+ 
+ 
+ // view engine setup
+@@ -131,28 +130,28 @@
+ app.use(bodyParser.json());
+ app.use(bodyParser.urlencoded({ extended: false }));
+ app.use(cookieParser());
+-app.use(checkAuth);
++// app.use(checkAuth);
+ app.use(express.static(path.join(__dirname, 'public')));
+ 
+ app.use('/', index);
+ 
+ // catch 404 and forward to error handler
+ app.use(function(req, res, next) {
+-  var err = new Error('Not Found');
+-  err.status = 404;
+-  next(err);
++    var err = new Error('Not Found');
++    err.status = 404;
++    next(err);
+ });
+ 
+ // error handler
+ app.use(function(err, req, res, next) {
+-  // set locals, only providing error in development
+-  res.locals.message = req.app.get('env') === 'development' ?
+-      err.message : "Buggy Code Found";
+-  res.locals.error = req.app.get('env') === 'development' ? err : {};
++    // set locals, only providing error in development
++    res.locals.message = req.app.get('env') === 'development' ?
++        err.message : "Buggy Code Found";
++    res.locals.error = req.app.get('env') === 'development' ? err : {};
+ 
+-  // render the error page
+-  res.status(err.status || 500);
+-  res.render('error');
++    // render the error page
++    res.status(err.status || 500);
++    res.render('error');
+ });
+ 
+ //Setting the Environment to Production. Dev by default.
+Index: node_modules/asap/package.json
+===================================================================
+--- node_modules/asap/package.json	(revision 9f1eb2fc1de7903c87110807d90b71138d537809)
++++ node_modules/asap/package.json	(revision 9f1eb2fc1de7903c87110807d90b71138d537809)
+@@ -1,73 +0,0 @@
+-{
+-  "_args": [
+-    [
+-      {
+-        "raw": "asap@~1.0.0",
+-        "scope": null,
+-        "escapedName": "asap",
+-        "name": "asap",
+-        "rawSpec": "~1.0.0",
+-        "spec": ">=1.0.0 <1.1.0",
+-        "type": "range"
+-      },
+-      "C:\\Users\\Akash\\express-crud-app-fsociety\\node_modules\\promise"
+-    ]
+-  ],
+-  "_from": "asap@>=1.0.0 <1.1.0",
+-  "_id": "asap@1.0.0",
+-  "_inCache": true,
+-  "_location": "/asap",
+-  "_npmUser": {
+-    "name": "kriskowal",
+-    "email": "kris.kowal@cixar.com"
+-  },
+-  "_npmVersion": "1.2.15",
+-  "_phantomChildren": {},
+-  "_requested": {
+-    "raw": "asap@~1.0.0",
+-    "scope": null,
+-    "escapedName": "asap",
+-    "name": "asap",
+-    "rawSpec": "~1.0.0",
+-    "spec": ">=1.0.0 <1.1.0",
+-    "type": "range"
+-  },
+-  "_requiredBy": [
+-    "/promise"
+-  ],
+-  "_resolved": "https://registry.npmjs.org/asap/-/asap-1.0.0.tgz",
+-  "_shasum": "b2a45da5fdfa20b0496fc3768cc27c12fa916a7d",
+-  "_shrinkwrap": null,
+-  "_spec": "asap@~1.0.0",
+-  "_where": "C:\\Users\\Akash\\express-crud-app-fsociety\\node_modules\\promise",
+-  "dependencies": {},
+-  "description": "High-priority task queue for Node.js and browsers",
+-  "devDependencies": {},
+-  "directories": {},
+-  "dist": {
+-    "shasum": "b2a45da5fdfa20b0496fc3768cc27c12fa916a7d",
+-    "tarball": "https://registry.npmjs.org/asap/-/asap-1.0.0.tgz"
+-  },
+-  "keywords": [
+-    "event",
+-    "task",
+-    "queue"
+-  ],
+-  "licenses": [
+-    {
+-      "type": "MIT",
+-      "url": "https://github.com/kriskowal/asap/raw/master/LICENSE.md"
+-    }
+-  ],
+-  "main": "asap",
+-  "maintainers": [
+-    {
+-      "name": "kriskowal",
+-      "email": "kris.kowal@cixar.com"
+-    }
+-  ],
+-  "name": "asap",
+-  "optionalDependencies": {},
+-  "readme": "ERROR: No README data found!",
+-  "version": "1.0.0"
+-}
+diff --git node_modules/promise/LICENSE node_modules/promise/LICENSE
+deleted file mode 100644
+index 7a1f763640a979bfe041c1bf0512ab353352bec1..0000000000000000000000000000000000000000
+GIT binary patch
+literal 0
+Hc$@<O00001
+
